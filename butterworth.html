@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Butterworth Filter (Magnitude Squared)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 { text-align: center; color: #2c3e50; }
+        .control-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .slider-group { margin-bottom: 15px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        .description { font-size: 0.9em; color: #666; margin-top: 2px; }
+        
+        .equation-box {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            font-family: 'Courier New', Courier, monospace;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .fraction {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+        }
+        .numerator {
+            border-bottom: 2px solid #2c3e50;
+            padding: 0 10px 5px 10px;
+        }
+        .denominator {
+            padding: 5px 10px 0 10px;
+        }
+        canvas { background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 10px;}
+    </style>
+</head>
+<body>
+
+    <h1>Butterworth Filter: Magnitude Squared</h1>
+    
+    <div class="control-panel">
+        <div class="slider-group">
+            <label>Cutoff Frequency (&Omega;<sub>c</sub>): <span id="cutoffVal">50</span> Hz</label>
+            <div class="description">Frequencies below this pass through.</div>
+            <input type="range" id="cutoffSlider" min="10" max="90" value="50">
+        </div>
+
+        <div class="slider-group">
+            <label>Filter Order (n): <span id="orderVal">2</span></label>
+            <div class="description">Higher order = a steeper drop-off cliff!</div>
+            <input type="range" id="orderSlider" min="1" max="10" step="1" value="2">
+        </div>
+    </div>
+
+    <div class="equation-box" id="equationDisplay">
+        </div>
+
+    <canvas id="filterChart" width="800" height="400"></canvas>
+
+    <script>
+        const ctx = document.getElementById('filterChart').getContext('2d');
+        
+        const filterChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], 
+                datasets: [{
+                    label: 'Magnitude Squared |H|²',
+                    data: [],
+                    borderColor: '#8e44ad',
+                    backgroundColor: 'rgba(142, 68, 173, 0.2)',
+                    borderWidth: 3,
+                    fill: true,
+                    pointRadius: 0,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Frequency &Omega; (Hz)', font: { size: 14, weight: 'bold' } } },
+                    y: { 
+                        title: { display: true, text: 'Squared Signal Strength (1 = Full Pass)', font: { size: 14, weight: 'bold' } },
+                        min: 0, max: 1.1 
+                    }
+                },
+                animation: false
+            }
+        });
+
+        function updateGraph() {
+            const fc = parseFloat(document.getElementById('cutoffSlider').value);
+            const n = parseInt(document.getElementById('orderSlider').value);
+            
+            document.getElementById('cutoffVal').innerText = fc;
+            document.getElementById('orderVal').innerText = n;
+
+            // --- The exact formula from your uploaded image! ---
+            const eqHTML = `
+                <strong>|H<sub>n</sub>(j&Omega;)|&sup2; = </strong>
+                <div class="fraction">
+                    <div class="numerator">1</div>
+                    <div class="denominator">1 + (&Omega; / &Omega;<sub>c</sub>)<sup>${2 * n}</sup></div>
+                </div>
+            `;
+            document.getElementById('equationDisplay').innerHTML = eqHTML;
+
+            let frequencies = [];
+            let magnitudesSquared = [];
+
+            // Calculate the signal strength from 0 to 100 Hz
+            for (let w = 0; w <= 100; w += 0.5) {
+                frequencies.push(w);
+                
+                // NO SQUARE ROOT! This perfectly matches your image.
+                let ratio = w / fc;
+                let denominator = 1 + Math.pow(ratio, 2 * n); 
+                let magSq = 1 / denominator;
+                
+                magnitudesSquared.push(magSq);
+            }
+
+            filterChart.data.labels = frequencies;
+            filterChart.data.datasets[0].data = magnitudesSquared;
+            filterChart.update();
+        }
+
+        document.getElementById('cutoffSlider').addEventListener('input', updateGraph);
+        document.getElementById('orderSlider').addEventListener('input', updateGraph);
+
+        updateGraph();
+    </script>
+</body>
+</html>

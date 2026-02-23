@@ -1,0 +1,2042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signal Processing & Filters Toolkit</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #eef2f5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        
+        .menu-container {
+            background-color: #fff;
+            padding: 15px 20px;
+            border: 1px solid #cdd4d9;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .menu-container label {
+            cursor: pointer;
+            font-weight: bold;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        iframe {
+            flex-grow: 1;
+            width: 100%;
+            border: 1px solid #cdd4d9;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+
+    <h2 style="margin-top: 0;">Filters & Transforms Control Panel</h2>
+
+    <div class="menu-container">
+        <label><input type="radio" name="fileSelector" value="butterworth" checked> Butterworth</label>
+        <label><input type="radio" name="fileSelector" value="transform_Bilinear"> Bilinear Transform</label>
+        <label><input type="radio" name="fileSelector" value="transform_subst"> Transform Subst</label>
+        <label><input type="radio" name="fileSelector" value="All_Filters"> All Filters</label>
+        <label><input type="radio" name="fileSelector" value="RLC_Order"> RLC Order</label>
+        <label><input type="radio" name="fileSelector" value="FreqConverter"> Freq Converter</label>
+        <label><input type="radio" name="fileSelector" value="filters"> Filters</label>
+    </div>
+
+    <iframe id="contentWindow" title="Filter Content"></iframe>
+
+    <template id="tpl_butterworth">
+        
+        <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Butterworth Filter (Magnitude Squared)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 { text-align: center; color: #2c3e50; }
+        .control-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .slider-group { margin-bottom: 15px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        .description { font-size: 0.9em; color: #666; margin-top: 2px; }
+        
+        .equation-box {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            font-family: 'Courier New', Courier, monospace;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .fraction {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+        }
+        .numerator {
+            border-bottom: 2px solid #2c3e50;
+            padding: 0 10px 5px 10px;
+        }
+        .denominator {
+            padding: 5px 10px 0 10px;
+        }
+        canvas { background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 10px;}
+    </style>
+</head>
+<body>
+
+    <h1>Butterworth Filter: Magnitude Squared</h1>
+    
+    <div class="control-panel">
+        <div class="slider-group">
+            <label>Cutoff Frequency (&Omega;<sub>c</sub>): <span id="cutoffVal">50</span> Hz</label>
+            <div class="description">Frequencies below this pass through.</div>
+            <input type="range" id="cutoffSlider" min="10" max="90" value="50">
+        </div>
+
+        <div class="slider-group">
+            <label>Filter Order (n): <span id="orderVal">2</span></label>
+            <div class="description">Higher order = a steeper drop-off cliff!</div>
+            <input type="range" id="orderSlider" min="1" max="10" step="1" value="2">
+        </div>
+    </div>
+
+    <div class="equation-box" id="equationDisplay">
+        </div>
+
+    <canvas id="filterChart" width="800" height="400"></canvas>
+
+    <script>
+        const ctx = document.getElementById('filterChart').getContext('2d');
+        
+        const filterChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], 
+                datasets: [{
+                    label: 'Magnitude Squared |H|²',
+                    data: [],
+                    borderColor: '#8e44ad',
+                    backgroundColor: 'rgba(142, 68, 173, 0.2)',
+                    borderWidth: 3,
+                    fill: true,
+                    pointRadius: 0,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Frequency &Omega; (Hz)', font: { size: 14, weight: 'bold' } } },
+                    y: { 
+                        title: { display: true, text: 'Squared Signal Strength (1 = Full Pass)', font: { size: 14, weight: 'bold' } },
+                        min: 0, max: 1.1 
+                    }
+                },
+                animation: false
+            }
+        });
+
+        function updateGraph() {
+            const fc = parseFloat(document.getElementById('cutoffSlider').value);
+            const n = parseInt(document.getElementById('orderSlider').value);
+            
+            document.getElementById('cutoffVal').innerText = fc;
+            document.getElementById('orderVal').innerText = n;
+
+            // --- The exact formula from your uploaded image! ---
+            const eqHTML = `
+                <strong>|H<sub>n</sub>(j&Omega;)|&sup2; = </strong>
+                <div class="fraction">
+                    <div class="numerator">1</div>
+                    <div class="denominator">1 + (&Omega; / &Omega;<sub>c</sub>)<sup>${2 * n}</sup></div>
+                </div>
+            `;
+            document.getElementById('equationDisplay').innerHTML = eqHTML;
+
+            let frequencies = [];
+            let magnitudesSquared = [];
+
+            // Calculate the signal strength from 0 to 100 Hz
+            for (let w = 0; w <= 100; w += 0.5) {
+                frequencies.push(w);
+                
+                // NO SQUARE ROOT! This perfectly matches your image.
+                let ratio = w / fc;
+                let denominator = 1 + Math.pow(ratio, 2 * n); 
+                let magSq = 1 / denominator;
+                
+                magnitudesSquared.push(magSq);
+            }
+
+            filterChart.data.labels = frequencies;
+            filterChart.data.datasets[0].data = magnitudesSquared;
+            filterChart.update();
+        }
+
+        document.getElementById('cutoffSlider').addEventListener('input', updateGraph);
+        document.getElementById('orderSlider').addEventListener('input', updateGraph);
+
+        updateGraph();
+    </script>
+</body>
+</html>
+
+        
+        </template>
+
+    <template id="tpl_transform_Bilinear">
+        
+        <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-Plane to Z-Plane Bilinear Transform</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            text-align: center;
+            margin: 20px;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .plane-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        canvas {
+            border: 1px solid #ccc;
+            background-color: #fff;
+        }
+        .controls {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .slider-group {
+            margin: 15px 0;
+            text-align: left;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .math-output {
+            font-family: monospace;
+            font-size: 1.1em;
+            background: #eef;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>The Bilinear Transformation "Funhouse Mirror"</h2>
+    <p>Move the sliders to shift a point in the continuous s-plane and see where it lands in the digital z-plane.</p>
+
+    <div class="controls">
+        <div class="slider-group">
+            <label><strong>Real Part (&sigma;): <span id="valSigma">0.00</span></strong> (Left/Right in s-plane)</label>
+            <input type="range" id="sigma" min="-5" max="5" step="0.1" value="-1">
+        </div>
+        <div class="slider-group">
+            <label><strong>Imaginary Part (j&omega;): <span id="valOmega">0.00</span></strong> (Up/Down in s-plane)</label>
+            <input type="range" id="omega" min="-5" max="5" step="0.1" value="2">
+        </div>
+        <div class="math-output" id="mathOutput">z = 0.00 + j0.00</div>
+    </div>
+
+    <div class="container">
+        <div class="plane-box">
+            <h3>Continuous s-plane</h3>
+            <canvas id="sPlane" width="300" height="300"></canvas>
+            <p>s = &sigma; + j&omega;</p>
+        </div>
+        <div class="plane-box">
+            <h3>Digital z-plane</h3>
+            <canvas id="zPlane" width="300" height="300"></canvas>
+            <p>z = (1 + s) / (1 - s)</p>
+        </div>
+    </div>
+
+    <script>
+        const sCanvas = document.getElementById('sPlane');
+        const zCanvas = document.getElementById('zPlane');
+        const sCtx = sCanvas.getContext('2d');
+        const zCtx = zCanvas.getContext('2d');
+        const sCenter = 150;
+        const zCenter = 150;
+        const sScale = 25; // pixels per unit
+        const zScale = 100; // pixels per unit (radius of unit circle)
+
+        function drawAxes(ctx, center) {
+            ctx.clearRect(0, 0, 300, 300);
+            ctx.beginPath();
+            ctx.moveTo(0, center); ctx.lineTo(300, center); // X axis
+            ctx.moveTo(center, 0); ctx.lineTo(center, 300); // Y axis
+            ctx.strokeStyle = "#aaa";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function drawUnitCircle(ctx, center) {
+            ctx.beginPath();
+            ctx.arc(center, center, zScale, 0, 2 * Math.PI);
+            ctx.strokeStyle = "rgba(0, 150, 0, 0.5)";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawPoint(ctx, x, y, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function update() {
+            const sigma = parseFloat(document.getElementById('sigma').value);
+            const omega = parseFloat(document.getElementById('omega').value);
+            
+            document.getElementById('valSigma').innerText = sigma.toFixed(2);
+            document.getElementById('valOmega').innerText = omega.toFixed(2);
+
+            // Draw S-Plane
+            drawAxes(sCtx, sCenter);
+            const sx = sCenter + (sigma * sScale);
+            const sy = sCenter - (omega * sScale); // Canvas Y is inverted
+            drawPoint(sCtx, sx, sy, "#ff4d4d");
+
+            // Calculate Z using Bilinear Transform: z = (1 + s) / (1 - s)
+            // Numerator: (1 + sigma) + j(omega)
+            const numReal = 1 + sigma;
+            const numImag = omega;
+            // Denominator: (1 - sigma) - j(omega)
+            const denReal = 1 - sigma;
+            const denImag = -omega;
+            
+            // Complex division
+            const denMagSq = (denReal * denReal) + (denImag * denImag);
+            let zReal = 0;
+            let zImag = 0;
+            
+            if (denMagSq !== 0) {
+                zReal = ((numReal * denReal) + (numImag * denImag)) / denMagSq;
+                zImag = ((numImag * denReal) - (numReal * denImag)) / denMagSq;
+            } else {
+                zReal = 999; // Infinity placeholder
+            }
+
+            document.getElementById('mathOutput').innerText = `z = ${zReal.toFixed(3)} ${zImag >= 0 ? '+' : '-'} j${Math.abs(zImag).toFixed(3)}\n|z| = ${Math.sqrt(zReal*zReal + zImag*zImag).toFixed(3)}`;
+
+            // Draw Z-Plane
+            drawAxes(zCtx, zCenter);
+            drawUnitCircle(zCtx, zCenter);
+            const zx = zCenter + (zReal * zScale);
+            const zy = zCenter - (zImag * zScale);
+            
+            // Only draw if it hasn't shot off to infinity
+            if (denMagSq !== 0 && Math.abs(zReal) < 5 && Math.abs(zImag) < 5) {
+                drawPoint(zCtx, zx, zy, "#4d79ff");
+            }
+        }
+
+        document.getElementById('sigma').addEventListener('input', update);
+        document.getElementById('omega').addEventListener('input', update);
+        update(); // Initial draw
+    </script>
+</body>
+</html>
+
+        
+        </template>
+
+    <template id="tpl_transform_subst">
+        
+        <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-Plane to Z-Plane: Numerical Substitution</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            text-align: center;
+            margin: 20px;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .plane-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            background-color: #fff;
+        }
+        .controls {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .slider-group {
+            margin: 15px 0;
+            text-align: left;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .math-output {
+            font-family: monospace;
+            font-size: 1.1em;
+            background: #eef;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .legend {
+            font-size: 0.9em;
+            margin-top: 10px;
+            text-align: left;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Numerical Substitution (Backward Difference)</h2>
+    <p>Notice how different this mapping is compared to the Bilinear Transform!</p>
+
+    <div class="controls">
+        <div class="slider-group">
+            <label><strong>Real Part (&sigma;): <span id="valSigma">0.00</span></strong> (Left/Right in s-plane)</label>
+            <input type="range" id="sigma" min="-5" max="5" step="0.1" value="0">
+        </div>
+        <div class="slider-group">
+            <label><strong>Imaginary Part (j&omega;): <span id="valOmega">0.00</span></strong> (Up/Down in s-plane)</label>
+            <input type="range" id="omega" min="-5" max="5" step="0.1" value="2">
+        </div>
+        <div class="math-output" id="mathOutput">z = 0.00 + j0.00</div>
+    </div>
+
+    <div class="container">
+        <div class="plane-box">
+            <h3>Continuous s-plane</h3>
+            <canvas id="sPlane" width="300" height="300"></canvas>
+            <p>s = &sigma; + j&omega;</p>
+        </div>
+        <div class="plane-box">
+            <h3>Digital z-plane</h3>
+            <canvas id="zPlane" width="300" height="300"></canvas>
+            <p>z = 1 / (1 - s)</p>
+            <div class="legend">
+                <span style="color: green; font-weight: bold;">- -</span> Absolute Digital Limit (Unit Circle)<br>
+                <span style="color: orange; font-weight: bold;">- -</span> Where the Analog Frequency Axis maps
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sCanvas = document.getElementById('sPlane');
+        const zCanvas = document.getElementById('zPlane');
+        const sCtx = sCanvas.getContext('2d');
+        const zCtx = zCanvas.getContext('2d');
+        const sCenter = 150;
+        const zCenter = 150;
+        const sScale = 25; 
+        const zScale = 100; // Radius of the unit circle
+
+        function drawAxes(ctx, center) {
+            ctx.clearRect(0, 0, 300, 300);
+            ctx.beginPath();
+            ctx.moveTo(0, center); ctx.lineTo(300, center); 
+            ctx.moveTo(center, 0); ctx.lineTo(center, 300); 
+            ctx.strokeStyle = "#aaa";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function drawCircles(ctx, center) {
+            // Draw the standard Unit Circle (Green)
+            ctx.beginPath();
+            ctx.arc(center, center, zScale, 0, 2 * Math.PI);
+            ctx.strokeStyle = "rgba(0, 150, 0, 0.4)";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+
+            // Draw the mapped j-omega axis circle (Orange)
+            // For Backward Difference, the jw axis maps to a circle at z = 0.5 with radius 0.5
+            ctx.beginPath();
+            ctx.arc(center + (0.5 * zScale), center, 0.5 * zScale, 0, 2 * Math.PI);
+            ctx.strokeStyle = "rgba(255, 140, 0, 0.8)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
+        }
+
+        function drawPoint(ctx, x, y, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function update() {
+            const sigma = parseFloat(document.getElementById('sigma').value);
+            const omega = parseFloat(document.getElementById('omega').value);
+            
+            document.getElementById('valSigma').innerText = sigma.toFixed(2);
+            document.getElementById('valOmega').innerText = omega.toFixed(2);
+
+            // Draw S-Plane
+            drawAxes(sCtx, sCenter);
+            const sx = sCenter + (sigma * sScale);
+            const sy = sCenter - (omega * sScale); 
+            drawPoint(sCtx, sx, sy, "#ff4d4d");
+
+            // Calculate Z using Backward Difference: z = 1 / (1 - s)
+            // z = 1 / ((1 - sigma) - j*omega)
+            const denReal = 1 - sigma;
+            const denImag = -omega;
+            
+            const denMagSq = (denReal * denReal) + (denImag * denImag);
+            let zReal = 0;
+            let zImag = 0;
+            
+            if (denMagSq !== 0) {
+                // Multiply top and bottom by complex conjugate
+                zReal = denReal / denMagSq;
+                zImag = -denImag / denMagSq; // -(-omega) = omega
+            }
+
+            document.getElementById('mathOutput').innerText = `z = ${zReal.toFixed(3)} ${zImag >= 0 ? '+' : '-'} j${Math.abs(zImag).toFixed(3)}\n|z| = ${Math.sqrt(zReal*zReal + zImag*zImag).toFixed(3)}`;
+
+            // Draw Z-Plane
+            drawAxes(zCtx, zCenter);
+            drawCircles(zCtx, zCenter);
+            const zx = zCenter + (zReal * zScale);
+            const zy = zCenter - (zImag * zScale);
+            
+            if (denMagSq !== 0 && Math.abs(zReal) < 5 && Math.abs(zImag) < 5) {
+                drawPoint(zCtx, zx, zy, "#4d79ff");
+            }
+        }
+
+        document.getElementById('sigma').addEventListener('input', update);
+        document.getElementById('omega').addEventListener('input', update);
+        update(); 
+    </script>
+</body>
+</html>
+
+        
+        </template>
+
+    <template id="tpl_All_Filters">
+        <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced DSP Visualizer</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+
+    body {
+        font-family: 'Roboto', sans-serif;
+        background-color: #f4f6f9;
+        color: #1f2937;
+        text-align: center;
+        padding: 30px;
+        margin: 0;
+    }
+
+    .container {
+        background: white;
+        padding: 40px;
+        border-radius: 16px;
+        max-width: 800px;
+        margin: auto;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e5e7eb;
+    }
+
+    h1 {
+        font-weight: 700;
+        color: #111827;
+        letter-spacing: 0.5px;
+        margin-top: 0;
+    }
+
+    p.subtitle {
+        color: #6b7280;
+        font-size: 16px;
+        margin-bottom: 30px;
+    }
+
+    /* Buttons */
+    .button-group {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 30px;
+    }
+
+    .filter-btn {
+        background: #f3f4f6;
+        color: #111827;
+        font-size: 15px;
+        font-weight: 600;
+        padding: 10px 18px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .filter-btn:hover {
+        background: #e5e7eb;
+    }
+
+    .filter-btn.active {
+        background: #2563eb;
+        color: white;
+        border-color: #1d4ed8;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    /* Slider */
+    .slider-container {
+        background: #f9fafb;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 40px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .slider-label {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 10px;
+        display: block;
+    }
+
+    .slider-value {
+        color: #2563eb;
+        font-weight: bold;
+    }
+
+    input[type=range] {
+        width: 100%;
+        appearance: none;
+        background: transparent;
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+        height: 6px;
+        background: #d1d5db;
+        border-radius: 6px;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+        appearance: none;
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        background: #2563eb;
+        cursor: pointer;
+        margin-top: -7px;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Graph */
+    .graph-wrapper {
+        background: #ffffff;
+        padding: 30px 20px 0 20px;
+        border-radius: 14px;
+        border: 1px solid #e5e7eb;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.03);
+    }
+
+    .graph {
+        display: flex;
+        justify-content: space-around;
+        align-items: flex-end;
+        height: 250px;
+    }
+
+    .subject {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        width: 25%;
+        height: 100%;
+    }
+
+    .bar-container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        background: #f3f4f6;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .bar {
+        width: 100%;
+        border-radius: 8px 8px 0 0;
+        transition: height 0.05s linear;
+    }
+
+    .low-bar { background: #f97316; }
+    .mid-bar { background: #16a34a; }
+    .high-bar { background: #7c3aed; }
+
+    /* Labels */
+    .labels-row {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 15px;
+        padding-bottom: 20px;
+    }
+
+    .label-box {
+        width: 25%;
+        text-align: center;
+    }
+
+    .emoji {
+        font-size: 40px;
+        margin-bottom: 6px;
+    }
+
+    .label-text {
+        font-size: 15px;
+        font-weight: 600;
+    }
+
+    .label-sub {
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>DSP Filter Studio</h1>
+    <p class="subtitle">Select a filter type and drag the frequency slider to see how it shapes the sound.</p>
+
+    <div class="button-group">
+        <button class="filter-btn active" onclick="setFilter('none', this)">Bypass (No Filter)</button>
+        <button class="filter-btn" onclick="setFilter('lowpass', this)">Low-Pass</button>
+        <button class="filter-btn" onclick="setFilter('highpass', this)">High-Pass</button>
+        <button class="filter-btn" onclick="setFilter('bandpass', this)">Band-Pass</button>
+        <button class="filter-btn" onclick="setFilter('notch', this)">Band-Stop (Notch)</button>
+    </div>
+
+    <div class="slider-container">
+        <label class="slider-label">
+            Cutoff / Center Frequency: <span class="slider-value" id="freqDisplay">All Sounds Passing</span>
+        </label>
+        <input type="range" id="freqSlider" min="0" max="100" value="50">
+    </div>
+
+    <div class="graph-wrapper">
+        <div class="graph">
+            <div class="subject">
+                <div class="bar-container">
+                    <div class="bar low-bar" id="barHum" style="height: 100%;"></div>
+                </div>
+            </div>
+            <div class="subject">
+                <div class="bar-container">
+                    <div class="bar mid-bar" id="barMan" style="height: 100%;"></div>
+                </div>
+            </div>
+            <div class="subject">
+                <div class="bar-container">
+                    <div class="bar high-bar" id="barBird" style="height: 100%;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="labels-row">
+            <div class="label-box">
+                <div class="emoji">🏭</div>
+                <div class="label-text">Factory Hum<br><span class="label-sub">Low Frequency</span></div>
+            </div>
+            <div class="label-box">
+                <div class="emoji">👨</div>
+                <div class="label-text">Man Speaking<br><span class="label-sub">Mid Frequency</span></div>
+            </div>
+            <div class="label-box">
+                <div class="emoji">🐦</div>
+                <div class="label-text">Bird Chirping<br><span class="label-sub">High Frequency</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Variables
+    let currentFilter = 'none';
+    const slider = document.getElementById('freqSlider');
+    const freqDisplay = document.getElementById('freqDisplay');
+    
+    // The bars
+    const barHum = document.getElementById('barHum');
+    const barMan = document.getElementById('barMan');
+    const barBird = document.getElementById('barBird');
+
+    // We imagine the 3 sounds live at these spots on our 0-100 slider
+    const posHum = 15;
+    const posMan = 50;
+    const posBird = 85;
+
+    // Handle Button Clicks
+    function setFilter(type, btnElement) {
+        currentFilter = type;
+        
+        // Update button styles
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        btnElement.classList.add('active');
+
+        updateGraph();
+    }
+
+    // Handle Slider Dragging
+    slider.addEventListener('input', updateGraph);
+
+    // The Math Engine that calculates bar heights visually
+    function updateGraph() {
+        let val = parseInt(slider.value);
+
+        // Update Slider Text
+        if (currentFilter === 'none') {
+            freqDisplay.innerText = "All Sounds Passing";
+            freqDisplay.style.color = "#94a3b8";
+        } else {
+            // Fake frequency numbers just to look cool (20Hz to 20,000Hz approx)
+            let fakeHz = Math.floor(20 + (val * 199.8)); 
+            freqDisplay.innerText = fakeHz + " Hz";
+            freqDisplay.style.color = "#38bdf8";
+        }
+
+        // Calculate heights (5% minimum so the bar never entirely vanishes, 100% max)
+        barHum.style.height = calculateGain(posHum, val, currentFilter) + "%";
+        barMan.style.height = calculateGain(posMan, val, currentFilter) + "%";
+        barBird.style.height = calculateGain(posBird, val, currentFilter) + "%";
+    }
+
+    // Logic for how the filter shapes the bars based on distance from the slider
+    function calculateGain(subjectPos, sliderPos, type) {
+        if (type === 'none') return 100;
+
+        let distance = subjectPos - sliderPos;
+        let gain = 100;
+        let steepness = 3.5; // Controls how sharp the cutoff cliff is
+
+        switch (type) {
+            case 'lowpass':
+                // High if subject is to the LEFT of slider
+                gain = 100 - (distance * steepness);
+                break;
+            case 'highpass':
+                // High if subject is to the RIGHT of slider
+                gain = 100 + (distance * steepness);
+                break;
+            case 'bandpass':
+                // High if subject is VERY CLOSE to slider
+                gain = 100 - (Math.abs(distance) * 4);
+                break;
+            case 'notch':
+                // Low if subject is VERY CLOSE to slider
+                gain = Math.abs(distance) * 4;
+                break;
+        }
+
+        // Keep it between 4% (just a sliver) and 100%
+        return Math.max(4, Math.min(100, gain));
+    }
+</script>
+
+</body>
+</html>
+
+        
+        
+        </template>
+
+    <template id="tpl_RLC_Order">
+    
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analog Filter Order & Response</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; text-align: center; padding: 20px; }
+        .container { background: white; max-width: 950px; margin: auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .controls { background: #e2e8f0; padding: 20px; border-radius: 15px; margin-bottom: 20px; }
+        .order-display { font-size: 28px; font-weight: bold; color: #2563eb; }
+        
+        /* Layout */
+        .main-view { display: flex; flex-direction: column; gap: 20px; }
+        
+        /* Circuit Styles */
+        #circuit-board {
+            height: 180px; display: flex; align-items: center; justify-content: center;
+            background: #fff; border: 2px solid #cbd5e1; border-radius: 15px; padding: 10px; overflow-x: auto;
+        }
+        .stage { display: flex; align-items: flex-start; }
+        .resistor-wire { display: flex; flex-direction: column; align-items: center; }
+        .resistor {
+            width: 60px; height: 20px; border: 3px solid #334155; background: #f59e0b;
+            display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold;
+        }
+        .horiz-line { width: 30px; height: 3px; background: #334155; align-self: center; }
+        .cap-branch { display: flex; flex-direction: column; align-items: center; width: 3px; }
+        .vert-line { width: 3px; height: 40px; background: #334155; }
+        .cap-plates { width: 30px; height: 12px; border-top: 4px solid #334155; border-bottom: 4px solid #334155; margin: 2px 0; }
+        .ground-symbol { font-size: 24px; line-height: 10px; margin-top: 5px; color: #334155; }
+
+        /* Graph Styles */
+        .graph-container { background: #1e293b; padding: 20px; border-radius: 15px; position: relative; }
+        canvas { background: #0f172a; width: 100%; height: 250px; border-radius: 10px; }
+        .graph-label { color: #94a3b8; font-size: 12px; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Analog Filter: Order vs. Response</h1>
+    
+    <div class="controls">
+        <label style="font-size: 18px; font-weight: bold;">Filter Order (Number of RLC Stages): <span class="order-display" id="orderVal">1</span></label><br><br>
+        <input type="range" id="orderSlider" min="1" max="8" value="1" style="width:80%">
+    </div>
+
+    <div class="main-view">
+        <div id="circuit-board"></div>
+
+        <div class="graph-container">
+            <div style="color: #38bdf8; font-weight: bold; margin-bottom: 10px;">Frequency Response Magnitude |H(jω)|</div>
+            <canvas id="responseChart"></canvas>
+            <div class="graph-label">Frequency (Low → High)</div>
+        </div>
+    </div>
+    
+    <p style="color: #64748b; margin-top: 20px;"><i>Higher order = More hardware components = Steeper "Brick Wall" cutoff.</i></p>
+</div>
+
+<script>
+    const slider = document.getElementById('orderSlider');
+    const display = document.getElementById('orderVal');
+    const board = document.getElementById('circuit-board');
+    const canvas = document.getElementById('responseChart');
+    const ctx = canvas.getContext('2d');
+
+    function updateAll() {
+        const order = parseInt(slider.value);
+        display.innerText = order;
+        drawCircuit(order);
+        drawGraph(order);
+    }
+
+    function drawCircuit(order) {
+        let html = '<div style="margin-right:10px; font-weight:bold; color:#64748b">IN</div>';
+        for (let i = 1; i <= order; i++) {
+            html += `
+                <div class="stage">
+                    <div class="resistor-wire">
+                        <div style="font-size:10px">R${i}</div>
+                        <div style="display:flex; align-items:center">
+                            <div class="horiz-line"></div>
+                            <div class="resistor"></div>
+                            <div class="horiz-line"></div>
+                        </div>
+                    </div>
+                    <div class="cap-branch">
+                        <div class="vert-line"></div>
+                        <div class="cap-plates"></div>
+                        <div style="font-size:10px; font-weight:bold">C${i}</div>
+                        <div class="ground-symbol">⏚</div>
+                    </div>
+                </div>
+            `;
+        }
+        html += '<div style="margin-left:10px; font-weight:bold; color:#64748b">OUT</div>';
+        board.innerHTML = html;
+    }
+
+    function drawGraph(order) {
+        // Adjust canvas resolution
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Grid
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for(let i=0; i<10; i++) {
+            let x = (canvas.width / 10) * i;
+            ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+            let y = (canvas.height / 10) * i;
+            ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+
+        // Draw Curve (Butterworth approximation)
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "#38bdf8";
+        ctx.beginPath();
+
+        const cutoff = canvas.width * 0.4; // Cutoff frequency point
+
+        for (let x = 0; x <= canvas.width; x++) {
+            // Formula for Magnitude of n-th order Butterworth: 1 / sqrt(1 + (w/wc)^(2n))
+            let w_ratio = x / cutoff;
+            let magnitude = 1 / Math.sqrt(1 + Math.pow(w_ratio, 2 * order));
+            
+            let y = canvas.height - (magnitude * (canvas.height * 0.8) + 20);
+            
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0; // Reset shadow
+    }
+
+    slider.addEventListener('input', updateAll);
+    window.addEventListener('resize', updateAll);
+    updateAll();
+</script>
+
+</body>
+</html>
+
+    
+        </template>
+
+    <template id="tpl_FreqConverter">
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hertz to Omega</title>
+    <style>
+        body { font-family: sans-serif; background: #ffffff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { width: 450px; text-align: center; border: 1px solid #eee; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        
+        #track {
+            width: 160px; height: 160px; margin: 0 auto 40px; border: 6px solid #333; 
+            border-radius: 50%; position: relative;
+        }
+        #runner {
+            width: 40px; height: 40px; position: absolute; 
+            top: -45px; 
+            left: 60px;
+            font-size: 30px; 
+            transform-origin: center 125px;
+            /* scaleX(1) ensures he faces the direction of travel (counter-clockwise) */
+            transform: scaleX(1); 
+        }
+
+        .dashboard { display: flex; justify-content: space-between; margin: 20px 0; gap: 20px; }
+        .box { flex: 1; }
+        .val { font-size: 36px; font-weight: bold; display: block; font-family: serif; }
+        .label { font-size: 14px; color: #888; font-weight: bold; }
+        .sub-label { font-size: 11px; color: #aaa; display: block; margin-top: 4px; }
+        
+        input[type=range] { width: 100%; margin: 25px 0; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="track">
+        <div id="runner">🏃</div>
+    </div>
+
+    <input type="range" id="speedSlider" min="0" max="2" step="0.25" value="1">
+    
+    <div class="dashboard">
+        <div class="box">
+            <span class="label">f (Hz)</span>
+            <span class="val" id="hzVal">1</span>
+            <span class="sub-label">Circles per second</span>
+        </div>
+        <div class="box">
+            <span class="label">ω (rad/sec)</span>
+            <span class="val" id="piVal">2π</span>
+            <span class="sub-label">Distance per second</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const slider = document.getElementById('speedSlider');
+    const hzVal = document.getElementById('hzVal');
+    const piVal = document.getElementById('piVal');
+    const runner = document.getElementById('runner');
+
+    let angle = 0;
+    let lastTime = performance.now();
+
+    function update(time) {
+        const dt = (time - lastTime) / 1000;
+        lastTime = time;
+        const f = parseFloat(slider.value);
+        
+        hzVal.innerText = f;
+        let piDisplay = (f * 2 === 0) ? "0" : (f * 2 === 1) ? "π" : (f * 2) + "π";
+        piVal.innerText = piDisplay;
+
+        // Decreasing the angle (angle -= ...) moves the runner Counter-Clockwise
+        // Combined with default emoji facing left, he now runs forward!
+        angle -= (f * 360 * dt);
+        runner.style.transform = `rotate(${angle}deg)`;
+        
+        requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+</script>
+
+</body>
+</html>
+
+        </template>
+
+    <template id="tpl_filters">
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RLC Lab Pro v3.0 (Smart)</title>
+    <style>
+        :root {
+            --bg-dark: #121214;
+            --bg-panel: #1c1c1f;
+            --bg-slot: #2a2a2d;
+            --accent: #00e5ff;
+            --text-main: #ececec;
+            --text-sub: #a0a0a0;
+            --border: #333;
+            
+            /* Component Colors */
+            --c-res: #ff5252;
+            --c-cap: #69f0ae;
+            --c-ind: #ffd740;
+            --c-wire: #9e9e9e;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden; 
+        }
+
+        /* --- LAYOUT GRID --- */
+        .app-container {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            grid-template-rows: 1fr;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 20;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+        }
+
+        .brand {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--accent);
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+        }
+
+        .palette-item {
+            background: var(--bg-slot);
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .palette-item:hover { border-color: var(--accent); transform: translateX(4px); background: #333; }
+        .palette-item:active { cursor: grabbing; }
+
+        .icon-box {
+            width: 28px; height: 28px;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 14px; color: #121212;
+        }
+
+        .help-box {
+            margin-top: auto;
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            line-height: 1.5;
+            border: 1px solid #333;
+        }
+
+        /* --- WORKSPACE --- */
+        .workspace {
+            display: grid;
+            grid-template-rows: 55% 45%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Circuit Board */
+        .circuit-section {
+            background: #151517;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid var(--border);
+            overflow: hidden; 
+        }
+
+        .circuit-scaler {
+            position: relative;
+            width: 90%;
+            max-width: 800px;
+            aspect-ratio: 800 / 460; 
+        }
+
+        svg.circuit-lines {
+            width: 100%;
+            height: 100%;
+            display: block;
+            pointer-events: none;
+            filter: drop-shadow(0px 0px 2px rgba(0,0,0,0.8));
+        }
+
+        /* Slots */
+        .slot {
+            position: absolute;
+            width: 8.75%;   
+            height: 15.2%;  
+            transform: translate(-50%, -50%);
+            
+            background: rgba(255,255,255,0.02);
+            border: 2px dashed #555;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            cursor: default;
+            z-index: 10;
+        }
+
+        .slot.drag-over {
+            background: rgba(0, 229, 255, 0.15);
+            border-color: var(--accent);
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        .slot.occupied {
+            background: var(--bg-panel);
+            border-style: solid;
+            border-color: #666;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        /* Positions */
+        #slot-1 { left: 30.6%; top: 28.2%; } 
+        #slot-2 { left: 49.3%; top: 28.2%; } 
+        #slot-3 { left: 70.0%; top: 55.4%; } 
+        #slot-4 { left: 70.0%; top: 79.3%; } 
+
+        .remove-btn {
+            position: absolute; top: -6px; right: -6px;
+            width: 18px; height: 18px;
+            background: #ff4040; color: white;
+            border-radius: 50%; border: none;
+            cursor: pointer; display: none;
+            font-size: 14px; line-height: 1; align-items: center; justify-content: center;
+        }
+        .slot.occupied .remove-btn { display: flex; }
+        .slot-label { font-size: 10px; color: #888; margin-top: 4px; pointer-events: none;}
+        
+        /* Dashboard */
+        .dashboard-section {
+            background: var(--bg-panel);
+            display: flex;
+            overflow: hidden;
+        }
+
+        .graph-panel {
+            flex: 2;
+            padding: 10px;
+            position: relative;
+            border-right: 1px solid var(--border);
+            cursor: col-resize; 
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            background: #111;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+
+        .controls-panel {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            min-width: 280px;
+        }
+
+        .panel-header {
+            font-size: 0.9rem;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-badge {
+            background: rgba(0, 229, 255, 0.1);
+            color: var(--accent);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            border: 1px solid rgba(0, 229, 255, 0.2);
+        }
+
+        /* NEW SMART ANALYSIS BOX */
+        .smart-readout {
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+        .smart-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+        }
+        .smart-row:last-child { margin-bottom: 0; }
+        .smart-label { color: #888; }
+        .smart-val { color: var(--accent); font-weight: bold; }
+
+        .control-row {
+            background: rgba(0,0,0,0.2);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            border-left: 3px solid transparent;
+        }
+
+        .control-row.active-R { border-color: var(--c-res); }
+        .control-row.active-L { border-color: var(--c-ind); }
+        .control-row.active-C { border-color: var(--c-cap); }
+
+        .control-label {
+            display: flex; justify-content: space-between;
+            font-size: 0.85rem; color: #ccc; margin-bottom: 8px;
+        }
+        
+        input[type=range] {
+            width: 100%;
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+            appearance: none;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px; height: 16px;
+            background: #ddd;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 2px solid #111;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); background: var(--accent); }
+        
+        .zoom-hint {
+            position: absolute;
+            bottom: 15px; right: 15px;
+            color: #444; font-size: 0.7rem;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="sidebar">
+        <div class="brand">RLC LAB <span style="font-size:0.6em; color:#888">v3.0</span></div>
+        
+        <div class="palette-item" draggable="true" data-type="R">
+            <div class="icon-box" style="background:var(--c-res)">R</div>
+            <span>Resistor</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="C">
+            <div class="icon-box" style="background:var(--c-cap)">C</div>
+            <span>Capacitor</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="L">
+            <div class="icon-box" style="background:var(--c-ind)">L</div>
+            <span>Inductor</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="W">
+            <div class="icon-box" style="background:var(--c-wire)">W</div>
+            <span>Short (Wire)</span>
+        </div>
+
+        <div class="help-box">
+            <strong>Configurations:</strong><br><br>
+            <span style="color:var(--c-res)">Low Pass:</span> R (Series), C (Shunt)<br>
+            <span style="color:var(--c-cap)">High Pass:</span> C (Series), R (Shunt)<br>
+            <span style="color:var(--accent)">Band Pass:</span> L+C (Series), R (Shunt)<br>
+            <span style="color:var(--c-ind)">Band Stop:</span> R (Series), L+C (Shunt)
+        </div>
+    </div>
+
+    <div class="workspace">
+        
+        <div class="circuit-section">
+            <div class="circuit-scaler">
+                <svg class="circuit-lines" viewBox="0 0 800 460" preserveAspectRatio="xMidYMid meet">
+                    <path d="M 50 130 L 245 130" stroke="#aaa" stroke-width="5" stroke-linecap="round"/>
+                    <text x="50" y="115" fill="#888" font-family="monospace">Vin</text>
+                    <path d="M 245 130 L 395 130" stroke="#aaa" stroke-width="5" />
+                    <path d="M 395 130 L 560 130" stroke="#aaa" stroke-width="5" />
+                    <path d="M 560 130 L 750 130" stroke="#aaa" stroke-width="5" stroke-linecap="round"/>
+                    <circle cx="560" cy="130" r="7" fill="#fff" />
+                    <text x="580" y="115" fill="#fff" font-family="monospace" font-size="14">Vout</text>
+                    <path d="M 560 130 L 560 260" stroke="#aaa" stroke-width="5" />
+                    <path d="M 560 260 L 560 370" stroke="#aaa" stroke-width="5" />
+                    <path d="M 560 370 L 560 430" stroke="#aaa" stroke-width="5" />
+                    <path d="M 540 430 L 580 430" stroke="#888" stroke-width="3" />
+                    <path d="M 548 436 L 572 436" stroke="#888" stroke-width="3" />
+                    <path d="M 556 442 L 564 442" stroke="#888" stroke-width="3" />
+                </svg>
+
+                <div id="slot-1" class="slot" data-id="1"><span class="slot-label">Z1</span><button class="remove-btn">×</button></div>
+                <div id="slot-2" class="slot" data-id="2"><span class="slot-label">Z2</span><button class="remove-btn">×</button></div>
+                <div id="slot-3" class="slot" data-id="3"><span class="slot-label">Z3</span><button class="remove-btn">×</button></div>
+                <div id="slot-4" class="slot" data-id="4"><span class="slot-label">Z4</span><button class="remove-btn">×</button></div>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <div class="graph-panel">
+                <canvas id="bodePlot"></canvas>
+                <div class="zoom-hint">Scroll to Zoom • Drag to Pan</div>
+            </div>
+            
+            <div class="controls-panel">
+                <div class="panel-header">
+                    <span>Smart Analysis</span>
+                </div>
+                
+                <div class="smart-readout">
+                    <div class="smart-row">
+                        <span class="smart-label">Type</span>
+                        <span id="read-type" class="smart-val">---</span>
+                    </div>
+                    <div class="smart-row">
+                        <span class="smart-label">Cutoff (-3dB)</span>
+                        <span id="read-cutoff" class="smart-val">---</span>
+                    </div>
+                    <div class="smart-row">
+                        <span class="smart-label">Resonance</span>
+                        <span id="read-res" class="smart-val">---</span>
+                    </div>
+                    <div class="smart-row">
+                        <span class="smart-label">Slope/Order</span>
+                        <span id="read-slope" class="smart-val">---</span>
+                    </div>
+                </div>
+
+                <div class="panel-header">
+                    <span>Parameters</span>
+                    <span id="circuit-status" class="status-badge">Open Circuit</span>
+                </div>
+                <div id="sliders-container">
+                    </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // --- CIRCUIT LOGIC ---
+    const circuit = {
+        1: { type: null, val: 1000 },
+        2: { type: 'W', val: 0 },
+        3: { type: null, val: 0.000001 },
+        4: { type: 'W', val: 0 }
+    };
+
+    const draggables = document.querySelectorAll('.palette-item');
+    const slots = document.querySelectorAll('.slot');
+
+    draggables.forEach(d => {
+        d.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('type', d.dataset.type);
+            e.dataTransfer.effectAllowed = "copy";
+        });
+    });
+
+    slots.forEach(slot => {
+        slot.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+        });
+        slot.addEventListener('dragenter', () => slot.classList.add('drag-over'));
+        slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+        
+        slot.addEventListener('drop', e => {
+            e.preventDefault();
+            slot.classList.remove('drag-over');
+            const type = e.dataTransfer.getData('type');
+            if(type) setComponent(slot.dataset.id, type);
+        });
+
+        slot.querySelector('.remove-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            setComponent(slot.dataset.id, null);
+        });
+    });
+
+    function setComponent(id, type) {
+        circuit[id].type = type;
+        if (type === 'R') circuit[id].val = 1000;
+        if (type === 'C') circuit[id].val = 0.000001;
+        if (type === 'L') circuit[id].val = 0.01;
+        if (type === 'W') circuit[id].val = 0;
+        updateUI();
+        drawGraph();
+    }
+
+    function formatVal(val, type) {
+        if(type==='R') {
+            if(val >= 1000000) return (val/1000000).toFixed(2) + " MΩ";
+            if(val >= 1000) return (val/1000).toFixed(2) + " kΩ";
+            return val.toFixed(1) + " Ω";
+        }
+        if(type==='C') {
+            if(val < 0.000000001) return (val*1000000000000).toFixed(1) + " pF";
+            if(val < 0.000001) return (val*1000000000).toFixed(1) + " nF";
+            return (val*1000000).toFixed(2) + " µF";
+        }
+        if(type==='L') {
+            if(val < 0.001) return (val*1000000).toFixed(1) + " µH";
+            if(val < 1.0) return (val*1000).toFixed(1) + " mH";
+            return val.toFixed(2) + " H";
+        }
+        return val;
+    }
+
+    function updateUI() {
+        for(let id=1; id<=4; id++){
+            const slot = document.getElementById(`slot-${id}`);
+            const comp = circuit[id];
+            const label = slot.querySelector('.slot-label');
+            if(comp.type) {
+                slot.classList.add('occupied');
+                let color = '#fff';
+                if(comp.type === 'R') color = 'var(--c-res)';
+                if(comp.type === 'C') color = 'var(--c-cap)';
+                if(comp.type === 'L') color = 'var(--c-ind)';
+                if(comp.type === 'W') color = 'var(--c-wire)';
+                label.innerHTML = `<div style="font-size:20px; color:${color}; font-weight:bold">${comp.type === 'W' ? '—' : comp.type}</div>`;
+            } else {
+                slot.classList.remove('occupied');
+                label.textContent = `Z${id}`;
+            }
+        }
+
+        const container = document.getElementById('sliders-container');
+        container.innerHTML = '';
+        let activeComps = 0;
+
+        for(let id=1; id<=4; id++){
+            const comp = circuit[id];
+            if(comp.type && comp.type !== 'W') {
+                activeComps++;
+                const row = document.createElement('div');
+                row.className = `control-row active-${comp.type}`;
+                let minExp, maxExp, currentExp, sliderVal;
+                
+                if(comp.type === 'R') { minExp = 0; maxExp = 6; } 
+                else if(comp.type === 'C') { minExp = -11; maxExp = -4; } 
+                else if(comp.type === 'L') { minExp = -6; maxExp = 0; }
+
+                currentExp = Math.log10(comp.val);
+                sliderVal = ((currentExp - minExp) / (maxExp - minExp)) * 1000;
+
+                row.innerHTML = `
+                    <div class="control-label">
+                        <span>Slot Z${id} (${comp.type})</span>
+                        <span id="val-${id}" style="color:#fff; font-weight:bold; font-family:monospace;">${formatVal(comp.val, comp.type)}</span>
+                    </div>
+                    <input type="range" id="input-${id}" min="0" max="1000" step="1" value="${sliderVal}">
+                `;
+
+                const input = row.querySelector('input');
+                const valSpan = row.querySelector(`#val-${id}`);
+                
+                input.addEventListener('input', (e) => {
+                    const pos = parseFloat(e.target.value);
+                    const exp = minExp + (pos/1000) * (maxExp - minExp);
+                    const val = Math.pow(10, exp);
+                    circuit[id].val = val;
+                    valSpan.textContent = formatVal(val, comp.type);
+                    drawGraph();
+                });
+                container.appendChild(row);
+            }
+        }
+
+        if(activeComps === 0) {
+            container.innerHTML = `<div style="color:#666; font-style:italic; font-size:0.8rem; text-align:center; margin-top:50px;">Drag components onto the board<br>to activate controls.</div>`;
+        }
+        updateStatusBadge();
+    }
+
+    function updateStatusBadge() {
+        const badge = document.getElementById('circuit-status');
+        const is = (id, t) => circuit[id].type === t;
+        const isLC = (id1, id2) => (is(id1,'L')||is(id1,'C')) && (is(id2,'L')||is(id2,'C'));
+        let text = "Custom Config";
+        if(is(2,'W') && is(4,'W')) {
+            if(is(1,'R') && is(3,'C')) text = "Low Pass (RC)";
+            else if(is(1,'C') && is(3,'R')) text = "High Pass (CR)";
+            else if(is(1,'L') && is(3,'R')) text = "High Pass (LR)";
+            else if(is(1,'R') && is(3,'L')) text = "Low Pass (RL)";
+        } 
+        else if (isLC(1,2) && (is(3,'R') || is(4,'R'))) { text = "Band Pass"; } 
+        else if ((is(1,'R') || is(2,'R')) && isLC(3,4)) { text = "Band Stop / Notch"; }
+        badge.textContent = text;
+    }
+
+    // --- MATH & GRAPH ---
+    const canvas = document.getElementById('bodePlot');
+    const ctx = canvas.getContext('2d');
+    
+    let view = { minF: 20, maxF: 20000 };
+    let isDragging = false;
+    let lastX = 0;
+
+    function getZ(id, f) {
+        const t = circuit[id].type;
+        const v = circuit[id].val;
+        const w = 2 * Math.PI * f;
+        if(!t) return {r:1e9, i:0}; 
+        if(t==='W') return {r:0.01, i:0};
+        if(t==='R') return {r:v, i:0};
+        if(t==='L') return {r:0, i:w*v};
+        if(t==='C') return {r:0, i:-1/(w*v)};
+        return {r:1e9, i:0};
+    }
+
+    function cAdd(a, b) { return {r:a.r+b.r, i:a.i+b.i}; }
+    function cDiv(a, b) {
+        const den = b.r*b.r + b.i*b.i;
+        if(den===0) return {r:0,i:0};
+        return {r:(a.r*b.r + a.i*b.i)/den, i:(a.i*b.r - a.r*b.i)/den};
+    }
+    function cMag(z) { return Math.sqrt(z.r*z.r + z.i*z.i); }
+
+    // --- NEW SMART ANALYSIS FUNCTIONS ---
+    function formatFreq(f) {
+        if(f >= 1000000) return (f/1000000).toFixed(2) + " MHz";
+        if(f >= 1000) return (f/1000).toFixed(2) + " kHz";
+        return f.toFixed(1) + " Hz";
+    }
+
+    function updateSmartReadouts(dataPoints) {
+        // dataPoints = [{f, db}, ...] covering the visible range or whole spectrum
+        
+        // 1. Determine Order (Count Reactive Components)
+        let order = 0;
+        for(let id=1; id<=4; id++){
+            const t = circuit[id].type;
+            if(t === 'L' || t === 'C') order++;
+        }
+        
+        const slope = order * 20; // 20dB per decade per order
+        const slopeText = order === 0 ? "Resistive (Flat)" : `${order} Order (${slope}dB/dec)`;
+        document.getElementById('read-slope').textContent = slopeText;
+
+        // 2. Find Max/Min/Start/End to guess type
+        // We need a broader sweep than just the zoom view for accurate detection
+        // So let's run a quick hidden sweep 10Hz to 1MHz
+        let minF = 10, maxF = 1000000;
+        let steps = 100;
+        let points = [];
+        let maxDb = -999;
+        let minDb = 999;
+        let maxF_val = 0;
+        
+        for(let i=0; i<steps; i++) {
+            let f = minF * Math.pow(maxF/minF, i/steps);
+            let z1 = getZ(1,f), z2 = getZ(2,f), z3 = getZ(3,f), z4 = getZ(4,f);
+            let zS = cAdd(z1,z2), zP = cAdd(z3,z4);
+            let H = cDiv(zP, cAdd(zS, zP));
+            let db = 20*Math.log10(cMag(H));
+            points.push({f, db});
+            if(db > maxDb) { maxDb = db; maxF_val = f; }
+            if(db < minDb) { minDb = db; }
+        }
+
+        const startDb = points[0].db;
+        const endDb = points[points.length-1].db;
+        const range = maxDb - minDb;
+
+        let type = "Unknown";
+        if(range < 3) type = "All Pass";
+        else if(startDb > endDb + 10 && maxDb - startDb < 3) type = "Low Pass";
+        else if(endDb > startDb + 10 && maxDb - endDb < 3) type = "High Pass";
+        else if(maxDb > startDb + 5 && maxDb > endDb + 5) type = "Band Pass";
+        else if(minDb < startDb - 5 && minDb < endDb - 5) type = "Band Stop";
+
+        document.getElementById('read-type').textContent = type;
+        
+        // 3. Find Resonance (Peak or Dip)
+        if(type === "Band Pass") {
+             document.getElementById('read-res').textContent = formatFreq(maxF_val);
+        } else {
+             document.getElementById('read-res').textContent = "---";
+        }
+
+        // 4. Find Cutoff (-3dB from max)
+        let cutoffStr = "---";
+        const threshold = maxDb - 3.0;
+
+        // Logic to find crossing point
+        // Simple linear scan
+        let found = [];
+        for(let i=0; i<points.length-1; i++){
+            let p1 = points[i];
+            let p2 = points[i+1];
+            if((p1.db > threshold && p2.db <= threshold) || (p1.db <= threshold && p2.db > threshold)) {
+                found.push(p1.f);
+            }
+        }
+        
+        if(found.length > 0) {
+            if(type === "Band Pass" && found.length >= 2) {
+                // Bandwidth
+                cutoffStr = formatFreq(found[1] - found[0]) + " (BW)";
+            } else {
+                cutoffStr = formatFreq(found[0]);
+            }
+        }
+        
+        document.getElementById('read-cutoff').textContent = cutoffStr;
+    }
+
+    function drawGraph() {
+        const w = canvas.parentElement.clientWidth;
+        const h = canvas.parentElement.clientHeight;
+        canvas.width = w; 
+        canvas.height = h;
+
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0,0,w,h);
+
+        ctx.lineWidth = 1;
+        const minLog = Math.log10(view.minF);
+        const maxLog = Math.log10(view.maxF);
+        const rangeLog = maxLog - minLog;
+
+        // Grid
+        let startPow = Math.floor(minLog);
+        let endPow = Math.ceil(maxLog);
+        
+        ctx.strokeStyle = "#222";
+        ctx.fillStyle = "#555";
+        ctx.font = "10px Arial";
+        ctx.textAlign = "center";
+
+        for(let p = startPow; p <= endPow; p++) {
+            const f = Math.pow(10, p);
+            const x = ((p - minLog) / rangeLog) * w;
+            if(x >= 0 && x <= w) {
+                ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+                let txt = f >= 1000 ? (f/1000)+'k' : f;
+                if(f >= 1000000) txt = (f/1000000)+'M';
+                ctx.fillText(txt, x, h-5);
+            }
+            for(let m=2; m<10; m++) {
+                const fm = f * m;
+                const xm = ((Math.log10(fm) - minLog) / rangeLog) * w;
+                if(xm >= 0 && xm <= w) {
+                    ctx.beginPath(); ctx.strokeStyle = "#1a1a1a"; 
+                    ctx.moveTo(xm,0); ctx.lineTo(xm,h); ctx.stroke();
+                }
+            }
+            ctx.strokeStyle = "#222"; 
+        }
+
+        ctx.strokeStyle = "#222";
+        ctx.textAlign = "left";
+        for(let db=0; db>=-60; db-=20) {
+            const y = h - ((db+60)/60)*h;
+            ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+            if(db!== -60) {
+               ctx.fillStyle="#444"; ctx.fillText(db+"dB", 5, y+12); 
+            }
+        }
+
+        // Curve
+        ctx.beginPath();
+        ctx.strokeStyle = "#00e5ff";
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "rgba(0, 229, 255, 0.5)";
+
+        for(let px=0; px<w; px++) {
+            const f = Math.pow(10, minLog + (px/w)*rangeLog);
+            
+            const z1 = getZ(1, f);
+            const z2 = getZ(2, f);
+            const zSeries = cAdd(z1, z2);
+
+            const z3 = getZ(3, f);
+            const z4 = getZ(4, f);
+            const zShunt = cAdd(z3, z4);
+
+            const zTotal = cAdd(zSeries, zShunt);
+            const H = cDiv(zShunt, zTotal);
+            const mag = cMag(H);
+
+            let db = 20*Math.log10(mag);
+            if(db < -60) db = -60;
+            const y = h - ((db+60)/60)*h;
+
+            if(px===0) ctx.moveTo(px,y); else ctx.lineTo(px,y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        
+        // TRIGGER SMART READOUT UPDATE
+        updateSmartReadouts();
+    }
+
+    // --- ZOOM & PAN ---
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomSpeed = 0.1;
+        const direction = e.deltaY > 0 ? 1 : -1; 
+        
+        const minLog = Math.log10(view.minF);
+        const maxLog = Math.log10(view.maxF);
+        const range = maxLog - minLog;
+        const change = range * zoomSpeed * direction;
+        
+        view.minF = Math.pow(10, minLog - change/2);
+        view.maxF = Math.pow(10, maxLog + change/2);
+        
+        if(view.minF < 0.1) view.minF = 0.1;
+        if(view.maxF > 1e9) view.maxF = 1e9;
+        drawGraph();
+    }, { passive: false });
+
+    canvas.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        lastX = e.clientX;
+        canvas.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+        canvas.style.cursor = 'col-resize';
+    });
+    window.addEventListener('mousemove', (e) => {
+        if(!isDragging) return;
+        const deltaPx = e.clientX - lastX;
+        lastX = e.clientX;
+        const w = canvas.width;
+        const minLog = Math.log10(view.minF);
+        const maxLog = Math.log10(view.maxF);
+        const range = maxLog - minLog;
+        const shift = -(deltaPx / w) * range;
+        view.minF = Math.pow(10, minLog + shift);
+        view.maxF = Math.pow(10, maxLog + shift);
+        drawGraph();
+    });
+
+    window.addEventListener('resize', drawGraph);
+    setComponent(1, 'L');
+    setComponent(2, 'C');
+    setComponent(3, 'R');
+    setComponent(4, 'W');
+
+</script>
+
+</body>
+</html>
+
+        </template>
+
+    <script>
+        const iframe = document.getElementById('contentWindow');
+        const radioButtons = document.querySelectorAll('input[name="fileSelector"]');
+
+        // Function to load the template into the iframe
+        function loadTool(toolName) {
+            const template = document.getElementById('tpl_' + toolName);
+            if (template) {
+                // Get the document inside the iframe
+                const iframeDoc = iframe.contentWindow.document;
+                
+                // Write the template's HTML into the iframe
+                iframeDoc.open();
+                iframeDoc.write(template.innerHTML);
+                iframeDoc.close();
+            }
+        }
+
+        // Load the Butterworth filter by default when the page opens
+        loadTool('butterworth');
+
+        // Listen for radio button clicks
+        radioButtons.forEach(radio => {
+            radio.addEventListener('change', function() {
+                loadTool(this.value);
+            });
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-Plane to Z-Plane Bilinear Transform</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            text-align: center;
+            margin: 20px;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .plane-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        canvas {
+            border: 1px solid #ccc;
+            background-color: #fff;
+        }
+        .controls {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .slider-group {
+            margin: 15px 0;
+            text-align: left;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .math-output {
+            font-family: monospace;
+            font-size: 1.1em;
+            background: #eef;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>The Bilinear Transformation "Funhouse Mirror"</h2>
+    <p>Move the sliders to shift a point in the continuous s-plane and see where it lands in the digital z-plane.</p>
+
+    <div class="controls">
+        <div class="slider-group">
+            <label><strong>Real Part (&sigma;): <span id="valSigma">0.00</span></strong> (Left/Right in s-plane)</label>
+            <input type="range" id="sigma" min="-5" max="5" step="0.1" value="-1">
+        </div>
+        <div class="slider-group">
+            <label><strong>Imaginary Part (j&omega;): <span id="valOmega">0.00</span></strong> (Up/Down in s-plane)</label>
+            <input type="range" id="omega" min="-5" max="5" step="0.1" value="2">
+        </div>
+        <div class="math-output" id="mathOutput">z = 0.00 + j0.00</div>
+    </div>
+
+    <div class="container">
+        <div class="plane-box">
+            <h3>Continuous s-plane</h3>
+            <canvas id="sPlane" width="300" height="300"></canvas>
+            <p>s = &sigma; + j&omega;</p>
+        </div>
+        <div class="plane-box">
+            <h3>Digital z-plane</h3>
+            <canvas id="zPlane" width="300" height="300"></canvas>
+            <p>z = (1 + s) / (1 - s)</p>
+        </div>
+    </div>
+
+    <script>
+        const sCanvas = document.getElementById('sPlane');
+        const zCanvas = document.getElementById('zPlane');
+        const sCtx = sCanvas.getContext('2d');
+        const zCtx = zCanvas.getContext('2d');
+        const sCenter = 150;
+        const zCenter = 150;
+        const sScale = 25; // pixels per unit
+        const zScale = 100; // pixels per unit (radius of unit circle)
+
+        function drawAxes(ctx, center) {
+            ctx.clearRect(0, 0, 300, 300);
+            ctx.beginPath();
+            ctx.moveTo(0, center); ctx.lineTo(300, center); // X axis
+            ctx.moveTo(center, 0); ctx.lineTo(center, 300); // Y axis
+            ctx.strokeStyle = "#aaa";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function drawUnitCircle(ctx, center) {
+            ctx.beginPath();
+            ctx.arc(center, center, zScale, 0, 2 * Math.PI);
+            ctx.strokeStyle = "rgba(0, 150, 0, 0.5)";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawPoint(ctx, x, y, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function update() {
+            const sigma = parseFloat(document.getElementById('sigma').value);
+            const omega = parseFloat(document.getElementById('omega').value);
+            
+            document.getElementById('valSigma').innerText = sigma.toFixed(2);
+            document.getElementById('valOmega').innerText = omega.toFixed(2);
+
+            // Draw S-Plane
+            drawAxes(sCtx, sCenter);
+            const sx = sCenter + (sigma * sScale);
+            const sy = sCenter - (omega * sScale); // Canvas Y is inverted
+            drawPoint(sCtx, sx, sy, "#ff4d4d");
+
+            // Calculate Z using Bilinear Transform: z = (1 + s) / (1 - s)
+            // Numerator: (1 + sigma) + j(omega)
+            const numReal = 1 + sigma;
+            const numImag = omega;
+            // Denominator: (1 - sigma) - j(omega)
+            const denReal = 1 - sigma;
+            const denImag = -omega;
+            
+            // Complex division
+            const denMagSq = (denReal * denReal) + (denImag * denImag);
+            let zReal = 0;
+            let zImag = 0;
+            
+            if (denMagSq !== 0) {
+                zReal = ((numReal * denReal) + (numImag * denImag)) / denMagSq;
+                zImag = ((numImag * denReal) - (numReal * denImag)) / denMagSq;
+            } else {
+                zReal = 999; // Infinity placeholder
+            }
+
+            document.getElementById('mathOutput').innerText = `z = ${zReal.toFixed(3)} ${zImag >= 0 ? '+' : '-'} j${Math.abs(zImag).toFixed(3)}\n|z| = ${Math.sqrt(zReal*zReal + zImag*zImag).toFixed(3)}`;
+
+            // Draw Z-Plane
+            drawAxes(zCtx, zCenter);
+            drawUnitCircle(zCtx, zCenter);
+            const zx = zCenter + (zReal * zScale);
+            const zy = zCenter - (zImag * zScale);
+            
+            // Only draw if it hasn't shot off to infinity
+            if (denMagSq !== 0 && Math.abs(zReal) < 5 && Math.abs(zImag) < 5) {
+                drawPoint(zCtx, zx, zy, "#4d79ff");
+            }
+        }
+
+        document.getElementById('sigma').addEventListener('input', update);
+        document.getElementById('omega').addEventListener('input', update);
+        update(); // Initial draw
+    </script>
+</body>
+</html>

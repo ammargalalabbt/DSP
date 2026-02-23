@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RLC Lab Pro v3.0 (Smart)</title>
+    <style>
+        :root {
+            --bg-dark: #121214;
+            --bg-panel: #1c1c1f;
+            --bg-slot: #2a2a2d;
+            --accent: #00e5ff;
+            --text-main: #ececec;
+            --text-sub: #a0a0a0;
+            --border: #333;
+            
+            /* Component Colors */
+            --c-res: #ff5252;
+            --c-cap: #69f0ae;
+            --c-ind: #ffd740;
+            --c-wire: #9e9e9e;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden; 
+        }
+
+        /* --- LAYOUT GRID --- */
+        .app-container {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            grid-template-rows: 1fr;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 20;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+        }
+
+        .brand {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--accent);
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+        }
+
+        .palette-item {
+            background: var(--bg-slot);
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .palette-item:hover { border-color: var(--accent); transform: translateX(4px); background: #333; }
+        .palette-item:active { cursor: grabbing; }
+
+        .icon-box {
+            width: 28px; height: 28px;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 14px; color: #121212;
+        }
+
+        .help-box {
+            margin-top: auto;
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            line-height: 1.5;
+            border: 1px solid #333;
+        }
+
+        /* --- WORKSPACE --- */
+        .workspace {
+            display: grid;
+            grid-template-rows: 55% 45%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Circuit Board */
+        .circuit-section {
+            background: #151517;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid var(--border);
+            overflow: hidden; 
+        }
+
+        .circuit-scaler {
+            position: relative;
+            width: 90%;
+            max-width: 800px;
+            aspect-ratio: 800 / 460; 
+        }
+
+        svg.circuit-lines {
+            width: 100%;
+            height: 100%;
+            display: block;
+            pointer-events: none;
+            filter: drop-shadow(0px 0px 2px rgba(0,0,0,0.8));
+        }
+
+        /* Slots */
+        .slot {
+            position: absolute;
+            width: 8.75%;   
+            height: 15.2%;  
+            transform: translate(-50%, -50%);
+            
+            background: rgba(255,255,255,0.02);
+            border: 2px dashed #555;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            cursor: default;
+            z-index: 10;
+        }
+
+        .slot.drag-over {
+            background: rgba(0, 229, 255, 0.15);
+            border-color: var(--accent);
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        .slot.occupied {
+            background: var(--bg-panel);
+            border-style: solid;
+            border-color: #666;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        /* Positions */
+        #slot-1 { left: 30.6%; top: 28.2%; } 
+        #slot-2 { left: 49.3%; top: 28.2%; } 
+        #slot-3 { left: 70.0%; top: 55.4%; } 
+        #slot-4 { left: 70.0%; top: 79.3%; } 
+
+        .remove-btn {
+            position: absolute; top: -6px; right: -6px;
+            width: 18px; height: 18px;
+            background: #ff4040; color: white;
+            border-radius: 50%; border: none;
+            cursor: pointer; display: none;
+            font-size: 14px; line-height: 1; align-items: center; justify-content: center;
+        }
+        .slot.occupied .remove-btn { display: flex; }
+        .slot-label { font-size: 10px; color: #888; margin-top: 4px; pointer-events: none;}
+        
+        /* Dashboard */
+        .dashboard-section {
+            background: var(--bg-panel);
+            display: flex;
+            overflow: hidden;
+        }
+
+        .graph-panel {
+            flex: 2;
+            padding: 10px;
+            position: relative;
+            border-right: 1px solid var(--border);
+            cursor: col-resize; 
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            background: #111;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+
+        .controls-panel {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            min-width: 280px;
+        }
+
+        .panel-header {
+            font-size: 0.9rem;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-badge {
+            background: rgba(0, 229, 255, 0.1);
+            color: var(--accent);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            border: 1px solid rgba(0, 229, 255, 0.2);
+        }
+
+        /* NEW SMART ANALYSIS BOX */
+        .smart-readout {
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+        .smart-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+        }
+        .smart-row:last-child { margin-bottom: 0; }
+        .smart-label { color: #888; }
+        .smart-val { color: var(--accent); font-weight: bold; }
+
+        .control-row {
+            background: rgba(0,0,0,0.2);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            border-left: 3px solid transparent;
+        }
+
+        .control-row.active-R { border-color: var(--c-res); }
+        .control-row.active-L { border-color: var(--c-ind); }
+        .control-row.active-C { border-color: var(--c-cap); }
+
+        .control-label {
+            display: flex; justify-content: space-between;
+            font-size: 0.85rem; color: #ccc; margin-bottom: 8px;
+        }
+        
+        input[type=range] {
+            width: 100%;
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+            appearance: none;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px; height: 16px;
+            background: #ddd;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 2px solid #111;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); background: var(--accent); }
+        
+        .zoom-hint {
+            position: absolute;
+            bottom: 15px; right: 15px;
+            color: #444; font-size: 0.7rem;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="sidebar">
+        <div class="brand">RLC LAB <span style="font-size:0.6em; color:#888">v3.0</span></div>
+        
+        <div class="palette-item" draggable="true" data-type="R">
+            <div class="icon-box" style="background:var(--c-res)">R</div>
+            <span>Resistor</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="C">
+            <div class="icon-box" style="background:var(--c-cap)">C</div>
+            <span>Capacitor</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="L">
+            <div class="icon-box" style="background:var(--c-ind)">L</div>
+            <span>Inductor</span>
+        </div>
+        <div class="palette-item" draggable="true" data-type="W">
+            <div class="icon-box" style="background:var(--c-wire)">W</div>
+            <span>Short (Wire)</span>
+        </div>
+
+        <div class="help-box">
+            <strong>Configurations:</strong><br><br>
+            <span style="color:var(--c-res)">Low Pass:</span> R (Series), C (Shunt)<br>
+            <span style="color:var(--c-cap)">High Pass:</span> C (Series), R (Shunt)<br>
+            <span style="color:var(--accent)">Band Pass:</span> L+C (Series), R (Shunt)<br>
+            <span style="color:var(--c-ind)">Band Stop:</span> R (Series), L+C (Shunt)
+        </div>
+    </div>
+
+    <div class="workspace">
+        
+        <div class="circuit-section">
+            <div class="circuit-scaler">
+                <svg class="circuit-lines" viewBox="0 0 800 460" preserveAspectRatio="xMidYMid meet">
+                    <path d="M 50 130 L 245 130" stroke="#aaa" stroke-width="5" stroke-linecap="round"/>
+                    <text x="50" y="115" fill="#888" font-family="monospace">Vin</text>
+                    <path d="M 245 130 L 395 130" stroke="#aaa" stroke-width="5" />
+                    <path d="M 395 130 L 560 130" stroke="#aaa" stroke-width="5" />
+                    <path d="M 560 130 L 750 130" stroke="#aaa" stroke-width="5" stroke-linecap="round"/>
+                    <circle cx="560" cy="130" r="7" fill="#fff" />
+                    <text x="580" y="115" fill="#fff" font-family="monospace" font-size="14">Vout</text>
+                    <path d="M 560 130 L 560 260" stroke="#aaa" stroke-width="5" />
+                    <path d="M 560 260 L 560 370" stroke="#aaa" stroke-width="5" />
+                    <path d="M 560 370 L 560 430" stroke="#aaa" stroke-width="5" />
+                    <path d="M 540 430 L 580 430" stroke="#888" stroke-width="3" />
+                    <path d="M 548 436 L 572 436" stroke="#888" stroke-width="3" />
+                    <path d="M 556 442 L 564 442" stroke="#888" stroke-width="3" />
+                </svg>
+
+                <div id="slot-1" class="slot" data-id="1"><span class="slot-label">Z1</span><button class="remove-btn">×</button></div>
+                <div id="slot-2" class="slot" data-id="2"><span class="slot-label">Z2</span><button class="remove-btn">×</button></div>
+                <div id="slot-3" class="slot" data-id="3"><span class="slot-label">Z3</span><button class="remove-btn">×</button></div>
+                <div id="slot-4" class="slot" data-id="4"><span class="slot-label">Z4</span><button class="remove-btn">×</button></div>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <div class="graph-panel">
+                <canvas id="bodePlot"></canvas>
+                <div class="zoom-hint">Scroll to Zoom • Drag to Pan</div>
+            </div>
+            
+            <div class="controls-panel">
+                <div class="panel-header">
+                    <span>Smart Analysis</span>
+                </div>
+                
+                <div class="smart-readout">
+                    <div class="smart-row">
+                        <span class="smart-label">Type</span>
+                        <span id="read-type" class="smart-val">---</span>
+                    </div>
+                    <div class="smart-row">
+                        <span class="smart-label">Cutoff (-3dB)</span>
+                        <span id="read-cutoff" class="smart-val">---</span>
+                    </div>
+                    <div class="smart-row">
+                        <span class="smart-label">Resonance</span>
+                        <span id="read-res" class="smart-val">---</span>
+                    </div>
+                    <div class="smart-row">
+                        <span class="smart-label">Slope/Order</span>
+                        <span id="read-slope" class="smart-val">---</span>
+                    </div>
+                </div>
+
+                <div class="panel-header">
+                    <span>Parameters</span>
+                    <span id="circuit-status" class="status-badge">Open Circuit</span>
+                </div>
+                <div id="sliders-container">
+                    </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // --- CIRCUIT LOGIC ---
+    const circuit = {
+        1: { type: null, val: 1000 },
+        2: { type: 'W', val: 0 },
+        3: { type: null, val: 0.000001 },
+        4: { type: 'W', val: 0 }
+    };
+
+    const draggables = document.querySelectorAll('.palette-item');
+    const slots = document.querySelectorAll('.slot');
+
+    draggables.forEach(d => {
+        d.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('type', d.dataset.type);
+            e.dataTransfer.effectAllowed = "copy";
+        });
+    });
+
+    slots.forEach(slot => {
+        slot.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+        });
+        slot.addEventListener('dragenter', () => slot.classList.add('drag-over'));
+        slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+        
+        slot.addEventListener('drop', e => {
+            e.preventDefault();
+            slot.classList.remove('drag-over');
+            const type = e.dataTransfer.getData('type');
+            if(type) setComponent(slot.dataset.id, type);
+        });
+
+        slot.querySelector('.remove-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            setComponent(slot.dataset.id, null);
+        });
+    });
+
+    function setComponent(id, type) {
+        circuit[id].type = type;
+        if (type === 'R') circuit[id].val = 1000;
+        if (type === 'C') circuit[id].val = 0.000001;
+        if (type === 'L') circuit[id].val = 0.01;
+        if (type === 'W') circuit[id].val = 0;
+        updateUI();
+        drawGraph();
+    }
+
+    function formatVal(val, type) {
+        if(type==='R') {
+            if(val >= 1000000) return (val/1000000).toFixed(2) + " MΩ";
+            if(val >= 1000) return (val/1000).toFixed(2) + " kΩ";
+            return val.toFixed(1) + " Ω";
+        }
+        if(type==='C') {
+            if(val < 0.000000001) return (val*1000000000000).toFixed(1) + " pF";
+            if(val < 0.000001) return (val*1000000000).toFixed(1) + " nF";
+            return (val*1000000).toFixed(2) + " µF";
+        }
+        if(type==='L') {
+            if(val < 0.001) return (val*1000000).toFixed(1) + " µH";
+            if(val < 1.0) return (val*1000).toFixed(1) + " mH";
+            return val.toFixed(2) + " H";
+        }
+        return val;
+    }
+
+    function updateUI() {
+        for(let id=1; id<=4; id++){
+            const slot = document.getElementById(`slot-${id}`);
+            const comp = circuit[id];
+            const label = slot.querySelector('.slot-label');
+            if(comp.type) {
+                slot.classList.add('occupied');
+                let color = '#fff';
+                if(comp.type === 'R') color = 'var(--c-res)';
+                if(comp.type === 'C') color = 'var(--c-cap)';
+                if(comp.type === 'L') color = 'var(--c-ind)';
+                if(comp.type === 'W') color = 'var(--c-wire)';
+                label.innerHTML = `<div style="font-size:20px; color:${color}; font-weight:bold">${comp.type === 'W' ? '—' : comp.type}</div>`;
+            } else {
+                slot.classList.remove('occupied');
+                label.textContent = `Z${id}`;
+            }
+        }
+
+        const container = document.getElementById('sliders-container');
+        container.innerHTML = '';
+        let activeComps = 0;
+
+        for(let id=1; id<=4; id++){
+            const comp = circuit[id];
+            if(comp.type && comp.type !== 'W') {
+                activeComps++;
+                const row = document.createElement('div');
+                row.className = `control-row active-${comp.type}`;
+                let minExp, maxExp, currentExp, sliderVal;
+                
+                if(comp.type === 'R') { minExp = 0; maxExp = 6; } 
+                else if(comp.type === 'C') { minExp = -11; maxExp = -4; } 
+                else if(comp.type === 'L') { minExp = -6; maxExp = 0; }
+
+                currentExp = Math.log10(comp.val);
+                sliderVal = ((currentExp - minExp) / (maxExp - minExp)) * 1000;
+
+                row.innerHTML = `
+                    <div class="control-label">
+                        <span>Slot Z${id} (${comp.type})</span>
+                        <span id="val-${id}" style="color:#fff; font-weight:bold; font-family:monospace;">${formatVal(comp.val, comp.type)}</span>
+                    </div>
+                    <input type="range" id="input-${id}" min="0" max="1000" step="1" value="${sliderVal}">
+                `;
+
+                const input = row.querySelector('input');
+                const valSpan = row.querySelector(`#val-${id}`);
+                
+                input.addEventListener('input', (e) => {
+                    const pos = parseFloat(e.target.value);
+                    const exp = minExp + (pos/1000) * (maxExp - minExp);
+                    const val = Math.pow(10, exp);
+                    circuit[id].val = val;
+                    valSpan.textContent = formatVal(val, comp.type);
+                    drawGraph();
+                });
+                container.appendChild(row);
+            }
+        }
+
+        if(activeComps === 0) {
+            container.innerHTML = `<div style="color:#666; font-style:italic; font-size:0.8rem; text-align:center; margin-top:50px;">Drag components onto the board<br>to activate controls.</div>`;
+        }
+        updateStatusBadge();
+    }
+
+    function updateStatusBadge() {
+        const badge = document.getElementById('circuit-status');
+        const is = (id, t) => circuit[id].type === t;
+        const isLC = (id1, id2) => (is(id1,'L')||is(id1,'C')) && (is(id2,'L')||is(id2,'C'));
+        let text = "Custom Config";
+        if(is(2,'W') && is(4,'W')) {
+            if(is(1,'R') && is(3,'C')) text = "Low Pass (RC)";
+            else if(is(1,'C') && is(3,'R')) text = "High Pass (CR)";
+            else if(is(1,'L') && is(3,'R')) text = "High Pass (LR)";
+            else if(is(1,'R') && is(3,'L')) text = "Low Pass (RL)";
+        } 
+        else if (isLC(1,2) && (is(3,'R') || is(4,'R'))) { text = "Band Pass"; } 
+        else if ((is(1,'R') || is(2,'R')) && isLC(3,4)) { text = "Band Stop / Notch"; }
+        badge.textContent = text;
+    }
+
+    // --- MATH & GRAPH ---
+    const canvas = document.getElementById('bodePlot');
+    const ctx = canvas.getContext('2d');
+    
+    let view = { minF: 20, maxF: 20000 };
+    let isDragging = false;
+    let lastX = 0;
+
+    function getZ(id, f) {
+        const t = circuit[id].type;
+        const v = circuit[id].val;
+        const w = 2 * Math.PI * f;
+        if(!t) return {r:1e9, i:0}; 
+        if(t==='W') return {r:0.01, i:0};
+        if(t==='R') return {r:v, i:0};
+        if(t==='L') return {r:0, i:w*v};
+        if(t==='C') return {r:0, i:-1/(w*v)};
+        return {r:1e9, i:0};
+    }
+
+    function cAdd(a, b) { return {r:a.r+b.r, i:a.i+b.i}; }
+    function cDiv(a, b) {
+        const den = b.r*b.r + b.i*b.i;
+        if(den===0) return {r:0,i:0};
+        return {r:(a.r*b.r + a.i*b.i)/den, i:(a.i*b.r - a.r*b.i)/den};
+    }
+    function cMag(z) { return Math.sqrt(z.r*z.r + z.i*z.i); }
+
+    // --- NEW SMART ANALYSIS FUNCTIONS ---
+    function formatFreq(f) {
+        if(f >= 1000000) return (f/1000000).toFixed(2) + " MHz";
+        if(f >= 1000) return (f/1000).toFixed(2) + " kHz";
+        return f.toFixed(1) + " Hz";
+    }
+
+    function updateSmartReadouts(dataPoints) {
+        // dataPoints = [{f, db}, ...] covering the visible range or whole spectrum
+        
+        // 1. Determine Order (Count Reactive Components)
+        let order = 0;
+        for(let id=1; id<=4; id++){
+            const t = circuit[id].type;
+            if(t === 'L' || t === 'C') order++;
+        }
+        
+        const slope = order * 20; // 20dB per decade per order
+        const slopeText = order === 0 ? "Resistive (Flat)" : `${order} Order (${slope}dB/dec)`;
+        document.getElementById('read-slope').textContent = slopeText;
+
+        // 2. Find Max/Min/Start/End to guess type
+        // We need a broader sweep than just the zoom view for accurate detection
+        // So let's run a quick hidden sweep 10Hz to 1MHz
+        let minF = 10, maxF = 1000000;
+        let steps = 100;
+        let points = [];
+        let maxDb = -999;
+        let minDb = 999;
+        let maxF_val = 0;
+        
+        for(let i=0; i<steps; i++) {
+            let f = minF * Math.pow(maxF/minF, i/steps);
+            let z1 = getZ(1,f), z2 = getZ(2,f), z3 = getZ(3,f), z4 = getZ(4,f);
+            let zS = cAdd(z1,z2), zP = cAdd(z3,z4);
+            let H = cDiv(zP, cAdd(zS, zP));
+            let db = 20*Math.log10(cMag(H));
+            points.push({f, db});
+            if(db > maxDb) { maxDb = db; maxF_val = f; }
+            if(db < minDb) { minDb = db; }
+        }
+
+        const startDb = points[0].db;
+        const endDb = points[points.length-1].db;
+        const range = maxDb - minDb;
+
+        let type = "Unknown";
+        if(range < 3) type = "All Pass";
+        else if(startDb > endDb + 10 && maxDb - startDb < 3) type = "Low Pass";
+        else if(endDb > startDb + 10 && maxDb - endDb < 3) type = "High Pass";
+        else if(maxDb > startDb + 5 && maxDb > endDb + 5) type = "Band Pass";
+        else if(minDb < startDb - 5 && minDb < endDb - 5) type = "Band Stop";
+
+        document.getElementById('read-type').textContent = type;
+        
+        // 3. Find Resonance (Peak or Dip)
+        if(type === "Band Pass") {
+             document.getElementById('read-res').textContent = formatFreq(maxF_val);
+        } else {
+             document.getElementById('read-res').textContent = "---";
+        }
+
+        // 4. Find Cutoff (-3dB from max)
+        let cutoffStr = "---";
+        const threshold = maxDb - 3.0;
+
+        // Logic to find crossing point
+        // Simple linear scan
+        let found = [];
+        for(let i=0; i<points.length-1; i++){
+            let p1 = points[i];
+            let p2 = points[i+1];
+            if((p1.db > threshold && p2.db <= threshold) || (p1.db <= threshold && p2.db > threshold)) {
+                found.push(p1.f);
+            }
+        }
+        
+        if(found.length > 0) {
+            if(type === "Band Pass" && found.length >= 2) {
+                // Bandwidth
+                cutoffStr = formatFreq(found[1] - found[0]) + " (BW)";
+            } else {
+                cutoffStr = formatFreq(found[0]);
+            }
+        }
+        
+        document.getElementById('read-cutoff').textContent = cutoffStr;
+    }
+
+    function drawGraph() {
+        const w = canvas.parentElement.clientWidth;
+        const h = canvas.parentElement.clientHeight;
+        canvas.width = w; 
+        canvas.height = h;
+
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0,0,w,h);
+
+        ctx.lineWidth = 1;
+        const minLog = Math.log10(view.minF);
+        const maxLog = Math.log10(view.maxF);
+        const rangeLog = maxLog - minLog;
+
+        // Grid
+        let startPow = Math.floor(minLog);
+        let endPow = Math.ceil(maxLog);
+        
+        ctx.strokeStyle = "#222";
+        ctx.fillStyle = "#555";
+        ctx.font = "10px Arial";
+        ctx.textAlign = "center";
+
+        for(let p = startPow; p <= endPow; p++) {
+            const f = Math.pow(10, p);
+            const x = ((p - minLog) / rangeLog) * w;
+            if(x >= 0 && x <= w) {
+                ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+                let txt = f >= 1000 ? (f/1000)+'k' : f;
+                if(f >= 1000000) txt = (f/1000000)+'M';
+                ctx.fillText(txt, x, h-5);
+            }
+            for(let m=2; m<10; m++) {
+                const fm = f * m;
+                const xm = ((Math.log10(fm) - minLog) / rangeLog) * w;
+                if(xm >= 0 && xm <= w) {
+                    ctx.beginPath(); ctx.strokeStyle = "#1a1a1a"; 
+                    ctx.moveTo(xm,0); ctx.lineTo(xm,h); ctx.stroke();
+                }
+            }
+            ctx.strokeStyle = "#222"; 
+        }
+
+        ctx.strokeStyle = "#222";
+        ctx.textAlign = "left";
+        for(let db=0; db>=-60; db-=20) {
+            const y = h - ((db+60)/60)*h;
+            ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+            if(db!== -60) {
+               ctx.fillStyle="#444"; ctx.fillText(db+"dB", 5, y+12); 
+            }
+        }
+
+        // Curve
+        ctx.beginPath();
+        ctx.strokeStyle = "#00e5ff";
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "rgba(0, 229, 255, 0.5)";
+
+        for(let px=0; px<w; px++) {
+            const f = Math.pow(10, minLog + (px/w)*rangeLog);
+            
+            const z1 = getZ(1, f);
+            const z2 = getZ(2, f);
+            const zSeries = cAdd(z1, z2);
+
+            const z3 = getZ(3, f);
+            const z4 = getZ(4, f);
+            const zShunt = cAdd(z3, z4);
+
+            const zTotal = cAdd(zSeries, zShunt);
+            const H = cDiv(zShunt, zTotal);
+            const mag = cMag(H);
+
+            let db = 20*Math.log10(mag);
+            if(db < -60) db = -60;
+            const y = h - ((db+60)/60)*h;
+
+            if(px===0) ctx.moveTo(px,y); else ctx.lineTo(px,y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        
+        // TRIGGER SMART READOUT UPDATE
+        updateSmartReadouts();
+    }
+
+    // --- ZOOM & PAN ---
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomSpeed = 0.1;
+        const direction = e.deltaY > 0 ? 1 : -1; 
+        
+        const minLog = Math.log10(view.minF);
+        const maxLog = Math.log10(view.maxF);
+        const range = maxLog - minLog;
+        const change = range * zoomSpeed * direction;
+        
+        view.minF = Math.pow(10, minLog - change/2);
+        view.maxF = Math.pow(10, maxLog + change/2);
+        
+        if(view.minF < 0.1) view.minF = 0.1;
+        if(view.maxF > 1e9) view.maxF = 1e9;
+        drawGraph();
+    }, { passive: false });
+
+    canvas.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        lastX = e.clientX;
+        canvas.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+        canvas.style.cursor = 'col-resize';
+    });
+    window.addEventListener('mousemove', (e) => {
+        if(!isDragging) return;
+        const deltaPx = e.clientX - lastX;
+        lastX = e.clientX;
+        const w = canvas.width;
+        const minLog = Math.log10(view.minF);
+        const maxLog = Math.log10(view.maxF);
+        const range = maxLog - minLog;
+        const shift = -(deltaPx / w) * range;
+        view.minF = Math.pow(10, minLog + shift);
+        view.maxF = Math.pow(10, maxLog + shift);
+        drawGraph();
+    });
+
+    window.addEventListener('resize', drawGraph);
+    setComponent(1, 'L');
+    setComponent(2, 'C');
+    setComponent(3, 'R');
+    setComponent(4, 'W');
+
+</script>
+
+</body>
+</html>

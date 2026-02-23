@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hertz to Omega</title>
+    <style>
+        body { font-family: sans-serif; background: #ffffff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { width: 450px; text-align: center; border: 1px solid #eee; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        
+        #track {
+            width: 160px; height: 160px; margin: 0 auto 40px; border: 6px solid #333; 
+            border-radius: 50%; position: relative;
+        }
+        #runner {
+            width: 40px; height: 40px; position: absolute; 
+            top: -45px; 
+            left: 60px;
+            font-size: 30px; 
+            transform-origin: center 125px;
+            /* scaleX(1) ensures he faces the direction of travel (counter-clockwise) */
+            transform: scaleX(1); 
+        }
+
+        .dashboard { display: flex; justify-content: space-between; margin: 20px 0; gap: 20px; }
+        .box { flex: 1; }
+        .val { font-size: 36px; font-weight: bold; display: block; font-family: serif; }
+        .label { font-size: 14px; color: #888; font-weight: bold; }
+        .sub-label { font-size: 11px; color: #aaa; display: block; margin-top: 4px; }
+        
+        input[type=range] { width: 100%; margin: 25px 0; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="track">
+        <div id="runner">🏃</div>
+    </div>
+
+    <input type="range" id="speedSlider" min="0" max="2" step="0.25" value="1">
+    
+    <div class="dashboard">
+        <div class="box">
+            <span class="label">f (Hz)</span>
+            <span class="val" id="hzVal">1</span>
+            <span class="sub-label">Circles per second</span>
+        </div>
+        <div class="box">
+            <span class="label">ω (rad/sec)</span>
+            <span class="val" id="piVal">2π</span>
+            <span class="sub-label">Distance per second</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const slider = document.getElementById('speedSlider');
+    const hzVal = document.getElementById('hzVal');
+    const piVal = document.getElementById('piVal');
+    const runner = document.getElementById('runner');
+
+    let angle = 0;
+    let lastTime = performance.now();
+
+    function update(time) {
+        const dt = (time - lastTime) / 1000;
+        lastTime = time;
+        const f = parseFloat(slider.value);
+        
+        hzVal.innerText = f;
+        let piDisplay = (f * 2 === 0) ? "0" : (f * 2 === 1) ? "π" : (f * 2) + "π";
+        piVal.innerText = piDisplay;
+
+        // Decreasing the angle (angle -= ...) moves the runner Counter-Clockwise
+        // Combined with default emoji facing left, he now runs forward!
+        angle -= (f * 360 * dt);
+        runner.style.transform = `rotate(${angle}deg)`;
+        
+        requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+</script>
+
+</body>
+</html>

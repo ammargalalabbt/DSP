@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analog Filter Order & Response</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; text-align: center; padding: 20px; }
+        .container { background: white; max-width: 950px; margin: auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .controls { background: #e2e8f0; padding: 20px; border-radius: 15px; margin-bottom: 20px; }
+        .order-display { font-size: 28px; font-weight: bold; color: #2563eb; }
+        
+        /* Layout */
+        .main-view { display: flex; flex-direction: column; gap: 20px; }
+        
+        /* Circuit Styles */
+        #circuit-board {
+            height: 180px; display: flex; align-items: center; justify-content: center;
+            background: #fff; border: 2px solid #cbd5e1; border-radius: 15px; padding: 10px; overflow-x: auto;
+        }
+        .stage { display: flex; align-items: flex-start; }
+        .resistor-wire { display: flex; flex-direction: column; align-items: center; }
+        .resistor {
+            width: 60px; height: 20px; border: 3px solid #334155; background: #f59e0b;
+            display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold;
+        }
+        .horiz-line { width: 30px; height: 3px; background: #334155; align-self: center; }
+        .cap-branch { display: flex; flex-direction: column; align-items: center; width: 3px; }
+        .vert-line { width: 3px; height: 40px; background: #334155; }
+        .cap-plates { width: 30px; height: 12px; border-top: 4px solid #334155; border-bottom: 4px solid #334155; margin: 2px 0; }
+        .ground-symbol { font-size: 24px; line-height: 10px; margin-top: 5px; color: #334155; }
+
+        /* Graph Styles */
+        .graph-container { background: #1e293b; padding: 20px; border-radius: 15px; position: relative; }
+        canvas { background: #0f172a; width: 100%; height: 250px; border-radius: 10px; }
+        .graph-label { color: #94a3b8; font-size: 12px; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Analog Filter: Order vs. Response</h1>
+    
+    <div class="controls">
+        <label style="font-size: 18px; font-weight: bold;">Filter Order (Number of RLC Stages): <span class="order-display" id="orderVal">1</span></label><br><br>
+        <input type="range" id="orderSlider" min="1" max="8" value="1" style="width:80%">
+    </div>
+
+    <div class="main-view">
+        <div id="circuit-board"></div>
+
+        <div class="graph-container">
+            <div style="color: #38bdf8; font-weight: bold; margin-bottom: 10px;">Frequency Response Magnitude |H(jω)|</div>
+            <canvas id="responseChart"></canvas>
+            <div class="graph-label">Frequency (Low → High)</div>
+        </div>
+    </div>
+    
+    <p style="color: #64748b; margin-top: 20px;"><i>Higher order = More hardware components = Steeper "Brick Wall" cutoff.</i></p>
+</div>
+
+<script>
+    const slider = document.getElementById('orderSlider');
+    const display = document.getElementById('orderVal');
+    const board = document.getElementById('circuit-board');
+    const canvas = document.getElementById('responseChart');
+    const ctx = canvas.getContext('2d');
+
+    function updateAll() {
+        const order = parseInt(slider.value);
+        display.innerText = order;
+        drawCircuit(order);
+        drawGraph(order);
+    }
+
+    function drawCircuit(order) {
+        let html = '<div style="margin-right:10px; font-weight:bold; color:#64748b">IN</div>';
+        for (let i = 1; i <= order; i++) {
+            html += `
+                <div class="stage">
+                    <div class="resistor-wire">
+                        <div style="font-size:10px">R${i}</div>
+                        <div style="display:flex; align-items:center">
+                            <div class="horiz-line"></div>
+                            <div class="resistor"></div>
+                            <div class="horiz-line"></div>
+                        </div>
+                    </div>
+                    <div class="cap-branch">
+                        <div class="vert-line"></div>
+                        <div class="cap-plates"></div>
+                        <div style="font-size:10px; font-weight:bold">C${i}</div>
+                        <div class="ground-symbol">⏚</div>
+                    </div>
+                </div>
+            `;
+        }
+        html += '<div style="margin-left:10px; font-weight:bold; color:#64748b">OUT</div>';
+        board.innerHTML = html;
+    }
+
+    function drawGraph(order) {
+        // Adjust canvas resolution
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Grid
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for(let i=0; i<10; i++) {
+            let x = (canvas.width / 10) * i;
+            ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+            let y = (canvas.height / 10) * i;
+            ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+
+        // Draw Curve (Butterworth approximation)
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "#38bdf8";
+        ctx.beginPath();
+
+        const cutoff = canvas.width * 0.4; // Cutoff frequency point
+
+        for (let x = 0; x <= canvas.width; x++) {
+            // Formula for Magnitude of n-th order Butterworth: 1 / sqrt(1 + (w/wc)^(2n))
+            let w_ratio = x / cutoff;
+            let magnitude = 1 / Math.sqrt(1 + Math.pow(w_ratio, 2 * order));
+            
+            let y = canvas.height - (magnitude * (canvas.height * 0.8) + 20);
+            
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0; // Reset shadow
+    }
+
+    slider.addEventListener('input', updateAll);
+    window.addEventListener('resize', updateAll);
+    updateAll();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-Plane to Z-Plane: Numerical Substitution</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            text-align: center;
+            margin: 20px;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .plane-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            background-color: #fff;
+        }
+        .controls {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .slider-group {
+            margin: 15px 0;
+            text-align: left;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .math-output {
+            font-family: monospace;
+            font-size: 1.1em;
+            background: #eef;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .legend {
+            font-size: 0.9em;
+            margin-top: 10px;
+            text-align: left;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Numerical Substitution (Backward Difference)</h2>
+    <p>Notice how different this mapping is compared to the Bilinear Transform!</p>
+
+    <div class="controls">
+        <div class="slider-group">
+            <label><strong>Real Part (&sigma;): <span id="valSigma">0.00</span></strong> (Left/Right in s-plane)</label>
+            <input type="range" id="sigma" min="-5" max="5" step="0.1" value="0">
+        </div>
+        <div class="slider-group">
+            <label><strong>Imaginary Part (j&omega;): <span id="valOmega">0.00</span></strong> (Up/Down in s-plane)</label>
+            <input type="range" id="omega" min="-5" max="5" step="0.1" value="2">
+        </div>
+        <div class="math-output" id="mathOutput">z = 0.00 + j0.00</div>
+    </div>
+
+    <div class="container">
+        <div class="plane-box">
+            <h3>Continuous s-plane</h3>
+            <canvas id="sPlane" width="300" height="300"></canvas>
+            <p>s = &sigma; + j&omega;</p>
+        </div>
+        <div class="plane-box">
+            <h3>Digital z-plane</h3>
+            <canvas id="zPlane" width="300" height="300"></canvas>
+            <p>z = 1 / (1 - s)</p>
+            <div class="legend">
+                <span style="color: green; font-weight: bold;">- -</span> Absolute Digital Limit (Unit Circle)<br>
+                <span style="color: orange; font-weight: bold;">- -</span> Where the Analog Frequency Axis maps
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sCanvas = document.getElementById('sPlane');
+        const zCanvas = document.getElementById('zPlane');
+        const sCtx = sCanvas.getContext('2d');
+        const zCtx = zCanvas.getContext('2d');
+        const sCenter = 150;
+        const zCenter = 150;
+        const sScale = 25; 
+        const zScale = 100; // Radius of the unit circle
+
+        function drawAxes(ctx, center) {
+            ctx.clearRect(0, 0, 300, 300);
+            ctx.beginPath();
+            ctx.moveTo(0, center); ctx.lineTo(300, center); 
+            ctx.moveTo(center, 0); ctx.lineTo(center, 300); 
+            ctx.strokeStyle = "#aaa";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function drawCircles(ctx, center) {
+            // Draw the standard Unit Circle (Green)
+            ctx.beginPath();
+            ctx.arc(center, center, zScale, 0, 2 * Math.PI);
+            ctx.strokeStyle = "rgba(0, 150, 0, 0.4)";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+
+            // Draw the mapped j-omega axis circle (Orange)
+            // For Backward Difference, the jw axis maps to a circle at z = 0.5 with radius 0.5
+            ctx.beginPath();
+            ctx.arc(center + (0.5 * zScale), center, 0.5 * zScale, 0, 2 * Math.PI);
+            ctx.strokeStyle = "rgba(255, 140, 0, 0.8)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
+        }
+
+        function drawPoint(ctx, x, y, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function update() {
+            const sigma = parseFloat(document.getElementById('sigma').value);
+            const omega = parseFloat(document.getElementById('omega').value);
+            
+            document.getElementById('valSigma').innerText = sigma.toFixed(2);
+            document.getElementById('valOmega').innerText = omega.toFixed(2);
+
+            // Draw S-Plane
+            drawAxes(sCtx, sCenter);
+            const sx = sCenter + (sigma * sScale);
+            const sy = sCenter - (omega * sScale); 
+            drawPoint(sCtx, sx, sy, "#ff4d4d");
+
+            // Calculate Z using Backward Difference: z = 1 / (1 - s)
+            // z = 1 / ((1 - sigma) - j*omega)
+            const denReal = 1 - sigma;
+            const denImag = -omega;
+            
+            const denMagSq = (denReal * denReal) + (denImag * denImag);
+            let zReal = 0;
+            let zImag = 0;
+            
+            if (denMagSq !== 0) {
+                // Multiply top and bottom by complex conjugate
+                zReal = denReal / denMagSq;
+                zImag = -denImag / denMagSq; // -(-omega) = omega
+            }
+
+            document.getElementById('mathOutput').innerText = `z = ${zReal.toFixed(3)} ${zImag >= 0 ? '+' : '-'} j${Math.abs(zImag).toFixed(3)}\n|z| = ${Math.sqrt(zReal*zReal + zImag*zImag).toFixed(3)}`;
+
+            // Draw Z-Plane
+            drawAxes(zCtx, zCenter);
+            drawCircles(zCtx, zCenter);
+            const zx = zCenter + (zReal * zScale);
+            const zy = zCenter - (zImag * zScale);
+            
+            if (denMagSq !== 0 && Math.abs(zReal) < 5 && Math.abs(zImag) < 5) {
+                drawPoint(zCtx, zx, zy, "#4d79ff");
+            }
+        }
+
+        document.getElementById('sigma').addEventListener('input', update);
+        document.getElementById('omega').addEventListener('input', update);
+        update(); 
+    </script>
+</body>
+</html>
